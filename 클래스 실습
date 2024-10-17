@@ -1,0 +1,87 @@
+import random
+
+class Account:
+    get_account_num = 0
+
+    def __init__(self, account_holder, at_money):
+        self.bank_name = "SC은행"
+        self.account_holder = account_holder
+        self.account_number = self.generate_account_number()
+        self.at_money = at_money
+
+        self.deposit_history = []  # 입금 내역 리스트
+        self.withdraw_history = []  # 출금 내역 리스트
+
+        Account.get_account_num += 1
+
+    def generate_account_number(self):
+        p1 = str(random.randint(100, 999))
+        p2 = str(random.randint(10, 99))
+        p3 = str(random.randint(100000, 999999))
+        return f"{p1}-{p2}-{p3}"
+
+    def deposit(self, total):
+        if total >= 1:
+            self.at_money += total
+            self.deposit_history.append(total)  # 입금 내역 추가
+            print(f"{total}원이 입금 완료되었습니다. 잔액은 {self.at_money:,}원 입니다.")
+        else:
+            print("입금은 최소 1원 이상만 가능합니다")
+
+    def withdraw(self, amt):
+        if amt <= 0:
+            print("출금 최소 금액은 0원 이상입니다.")
+        elif amt <= self.at_money:
+            self.at_money -= amt  # 잔고 차감
+            self.withdraw_history.append(amt)  # 출금 내역 추가
+            print(f"{amt}원이 정상 출금 되었습니다. 잔액은 {self.at_money:,}원 입니다.")
+        else:
+            print("출금은 계좌의 잔고 이상으로 출금할 수는 없습니다.")
+
+    def display_info(self):
+        formatted_balance = f"{self.at_money:,}"
+        print(f"은행이름: {self.bank_name}, 예금주: {self.account_holder}, 계좌번호: {self.account_number}, 잔고: {formatted_balance}원")
+
+    def interest(self, count):
+        if count >= 5 and count % 5 == 0:
+            interest_amount = self.at_money * 0.01  # 1% 이자
+            self.at_money += interest_amount
+            print(f"이자가 지급되었습니다: {interest_amount:,}원. 잔액은 {self.at_money:,}원 입니다.")
+
+    def show_deposit_history(self):
+        if self.deposit_history:
+            print("입금 내역:")
+            for amount in self.deposit_history:
+                print(f"{amount:,}원")
+        else:
+            print("입금 내역이 없습니다.")
+
+    def show_withdraw_history(self):
+        if self.withdraw_history:
+            print("출금 내역:")
+            for amount in self.withdraw_history:
+                print(f"{amount:,}원")
+        else:
+            print("출금 내역이 없습니다.")
+
+# 인스턴스를 저장할 리스트 생성
+accounts = []
+accounts.append(Account("김용재 고객님", 100000))
+accounts.append(Account("윤태경 고객님", 100000))
+accounts.append(Account("김소연 고객님", 10000000))
+
+# 테스트
+c1 = accounts[0]
+c1.deposit(50000)
+c1.withdraw(10000)
+
+# 내역 출력
+c1.display_info()
+c1.show_deposit_history()
+c1.show_withdraw_history()
+
+# 잔고가 100만 원 이상인 고객 정보 출력
+print("\n잔고가 100만원 이상인 고객 정보:")
+for account in accounts:
+    if account.at_money >= 1000000:
+        account.display_info()

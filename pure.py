@@ -119,15 +119,17 @@ def main():
 
     with st.sidebar:
         uploaded_files = st.file_uploader("📄 강의 자료 업로드", type=["pdf", "docx", "pptx"], accept_multiple_files=True)
+        problem_files = st.file_uploader("❓ 문제 업로드 (선택 사항)", type=["pdf", "docx", "pptx"], accept_multiple_files=True)  # 새로운 업로드란
         openai_api_key = st.text_input("🔑 OpenAI API 키", type="password")
         exam_date = st.date_input("📅 시험 날짜를 선택하세요")
         process_button = st.button("🚀 벼락치기 시작하기")
         create_summary = st.checkbox("핵심 요약 생성", value=True)
         create_roadmap = st.checkbox("공부 로드맵 생성", value=True)
         create_quiz = st.checkbox("예상 문제 생성", value=True)
+        generate_related_problems = st.checkbox("연관 문제 생성 (문제 업로드 시)", value=True)  # 새로운 체크박스 추가
+        selected_files = st.multiselect("요약을 확인할 파일을 선택하세요:", list(st.session_state.summary.keys()))
         
         # 파일별 요약 결과 선택 (다중 선택 가능)
-        selected_files = st.multiselect("요약을 확인할 파일을 선택하세요:", list(st.session_state.summary.keys()))
 
     if process_button:
         if not openai_api_key:
@@ -169,6 +171,13 @@ def main():
             st.session_state.quiz = generate_quiz_questions(
                 "\n".join(st.session_state.summary.values()), llm
             )
+        # 문제 텍스트를 최대 길이로 자르는 함수
+        def truncate_text(text, max_tokens=2000):
+            """텍스트를 최대 토큰 수로 제한합니다."""
+            tokens = text.split()  # 단어 단위로 나눕니다
+            if len(tokens) > max_tokens:
+                return " ".join(tokens[:max_tokens])
+            return text
 
     if st.session_state.uploaded_text:
         if create_summary and selected_files:
@@ -184,5 +193,53 @@ def main():
             st.subheader("❓ 예상 문제")
             st.markdown(st.session_state.quiz)
 
+        if problem_files and generate_related_problems:
+            st.subheader("📝 업로드된 문제와 관련된 새 문제 및 풀이")
+            for file in problem_files:
+                problem_text = extract_text_from_file(file)
+                if problem_text:
+                    # 문제 텍스트 자르기
+                    truncated_problem_text = truncate_text(problem_text, max_tokens=2000)
+                    messages = [
+                        SystemMessage(content="당신은 한국 대학생을 위한 문제 생성 및 풀이 작성 도우미입니다."),
+                        HumanMessage(content=f"""
+                        다음 텍스트를 기반으로 최소 5개의 학문적 수준의 문제를 작성하고, 각 문제에 대한 보기와 풀이는 다음 형식으로 제공해주세요:
+                        1. 문제: [문제 내용]
+                        보기:
+                        A) [보기1]
+                        B) [보기2]
+                        C) [보기3]
+                        D) [보기4]
+                        풀이: [문제 풀이]
+                        텍스트:
+                        {truncated_problem_text}
+                        """)
+                    ]
+                    try:
+                        # 모델 호출
+                        response = llm(messages)
+                        generated_questions = response.content.split("\n\n")  # 문제와 풀이 분리
+                        st.markdown(f"**파일명: {file.name}**")
+
+                        # 생성된 문제 출력
+                        for idx, question_block in enumerate(generated_questions, 1):
+                            # 문제와 풀이 분리
+                            parts = question_block.split("풀이:")
+                            question_text = parts[0].strip()
+                            solution_text = parts[1].strip() if len(parts) > 1 else "풀이 없음"
+
+                            # 문제 본문 출력
+                            st.markdown(f"### 문제 {idx}")
+                            st.markdown(question_text.replace("보기:", "\n\n**보기:**"))
+
+                            # 풀이 숨기기
+                            with st.expander(f"풀이 보기 (문제 {idx})"):
+                                st.markdown(solution_text)
+                    except Exception as e:
+                        st.error(f"오류 발생: {e}")
+
+
+
+        
 if __name__ == "__main__":
     main()

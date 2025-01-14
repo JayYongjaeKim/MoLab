@@ -194,7 +194,7 @@ def main():
             st.markdown(st.session_state.quiz)
 
         if problem_files and generate_related_problems:
-            st.subheader("📝 업로드된 문제와 관련된 새 문제 및 풀이")
+            st.subheader("📝 중간&기말 관련 문제 및 풀이")
             for file in problem_files:
                 problem_text = extract_text_from_file(file)
                 if problem_text:

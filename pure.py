@@ -9,6 +9,10 @@ from langchain.vectorstores import FAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import AIMessage, HumanMessage, SystemMessage, Document
 from datetime import datetime
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+from rouge_score import rouge_scorer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Streamlit 페이지 설정
 st.set_page_config(
@@ -41,8 +45,8 @@ def extract_text_from_file(file):
 # 텍스트 청크로 분할
 def split_text_into_chunks(uploaded_text):
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=3000,  # 크기 증가로 처리량 감소
-        chunk_overlap=200
+        chunk_size=2000,  # 청크 크기 조정
+        chunk_overlap=300  # 청크 중첩 증가
     )
     documents = [Document(page_content=text) for text in uploaded_text.values()]
     return text_splitter.split_documents(documents)
@@ -52,21 +56,22 @@ def create_vectorstore(text_chunks):
     embeddings = HuggingFaceEmbeddings(model_name="jhgan/ko-sroberta-multitask")
     return FAISS.from_documents(text_chunks, embeddings)
 
-# 텍스트 요약 (병렬 처리 적용)
+# 텍스트 요약 (문단별로 처리 및 개선)
 def summarize_text(text_chunks, llm, max_summary_length=2000):
     def process_chunk(chunk):
         text = chunk.page_content
         messages = [
-            SystemMessage(content="당신은 유능한 한국어 요약 도우미입니다."),
-            HumanMessage(content=f"다음 텍스트를 한국어로 요약해주세요:\n\n{text}")
+            SystemMessage(content="당신은 유능한 한국어 요약 도우미입니다. 요약은 간결하고 핵심 내용을 중심으로 작성해야 합니다."),
+            HumanMessage(content=f"다음 텍스트를 한국어로 요약해주세요. 각 요약 항목은 핵심 내용을 포함하며 '-'로 시작하도록 작성해주세요:\n\n{text}")
         ]
         response = llm(messages)
-        return response.content
+        return response.content.strip()
 
     with ThreadPoolExecutor(max_workers=4) as executor:  # 병렬 처리
         summaries = list(executor.map(process_chunk, text_chunks))
-    
-    combined_summary = "\n".join(summaries)
+
+    # 요약 항목을 빈 줄로 구분하여 결합
+    combined_summary = "\n\n".join([f"- {summary}" for summary in summaries])
     return combined_summary[:max_summary_length] + "..." if len(combined_summary) > max_summary_length else combined_summary
 
 # 공부 로드맵 생성
@@ -172,6 +177,7 @@ def main():
             for selected_file in selected_files:
                 st.markdown(f"**파일명: {selected_file}**")
                 st.markdown(st.session_state.summary[selected_file].replace("\n", "\n\n"))
+
         if create_roadmap:
             st.subheader("📋 공부 로드맵")
             st.markdown(st.session_state.roadmap)
